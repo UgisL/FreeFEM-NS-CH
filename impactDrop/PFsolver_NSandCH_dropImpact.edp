@@ -1,0 +1,471 @@
+// ----------------------------------------------- COPYRIGHT --------------------------------------
+// Copyright 2020-2022
+// Ugis Lacis, ugis.lacis@gmail.com
+// Shervin Bagheri, shervin.bagheri@mech.kth.se
+// -------------------------------------------- LICENSE LGPLv3 ------------------------------------
+// This file is part of FreeFEM-NS-CH.
+//
+// Porous_full_bc2ifScales is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// FreeFEM-NS-CH is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with FreeFEM-NS-CH. If not, see <http://www.gnu.org/licenses/>.
+
+// Level of output
+verbosity = 0;
+
+load "gmsh";
+load "iovtk";
+load "UMFPACK64";
+load "isoline";
+load "Element_P3";
+// load "MUMPS";
+
+include "include_postProc.idp"
+
+// Physical parameters in dimensional units (properties at 25 deg) 
+// Reference L = 0.125 mm, muw = 8.9e-4 Pa s, rhow = 1000 kg/m3, mug = 1.85e-5, rhog = 1.18 kg/m3, sigma = 0.072 N/m
+// Ca = muw*U/sigma = 0.1 -> Uref = 8.09 m/s, Tref = L/U = 0.01545 ms
+
+// Impact velocity [m/s]
+real Uimp = 2.0;
+
+// Render impact velocity non-dimensional
+real UimpNd = Uimp/8.09;
+
+// Other physical parameters
+real Ca  = 0.1;
+real Cn  = 0.025;
+// According to Yue sharp interface, Pe < 16*sqrt(mu)*Ca/Cn = 18.46 (for these parameters)
+real Pe  = 7.116318;      // Small Pe number - seems that I need more non-lin iterations; or smaller time step
+real Re  = 907.4;
+real mu2 = 1.812e-2;
+real rho2= 1.206e-3;
+real thE = 112.0/180.0*pi;
+real mufa= 79.96;
+real mufr= 79.96;
+
+// Domain extent (use 0.125 mm as reference length scale)
+real xmin = -4.15;
+real xmax =  4.15;
+real ymin =  0.0;
+real ymax =  3.85;
+
+// Parameters of the rough surface
+real ph = 0.16;   // height
+real pw = 0.16;   // width
+real pd = 0.48;   // pitch
+real pa = 60.0/180.0*pi; // tilt angle
+
+// Parameters of the drop
+real dR = 1.0;  // Radius
+real dxc= 0.0;  // x coordinate
+real dyc= 1.0+ph;  // y coordinate
+real yct= dyc; // Variable to track the y coordinate of center of mass
+real xct= dxc; // -;- x coordinate -;-
+
+
+// Mesh resolution
+int  n     = 12; // Number of segments per unit length
+real refI  = 15.0; // Refinement factor for the interface
+// refI = 30.0;
+real mGrw  = 1.2;  // Growth rate of the mesh elements
+
+// Other parameters, time step, duration, save, tolerances, etc.
+real dt    = 0.002;
+real tfin  = 10.0;
+real tout  = 0.02;
+int  dref  = 50; // Number of time-steps between mesh adaption
+real tolNI = 1.0e-9; // Tolerance for non-linear iterations
+int  mni   = 1000;
+int  bNew  = 1; // 1-start new simulation; 0-restart from previous state
+
+// Limiting maximum number of iterations in infinite loops
+int Icur, Imax = 100;
+
+// Initialise the drop
+func initC = -tanh((sqrt((x-dxc)^2+(y-dyc)^2)-dR)/sqrt(2)/Cn);
+
+
+// Define the mesh (1 - bottom, 2 - right, 3 - top, 4 - left), plot
+// // Smooth surface
+// mesh Th = square((xmax-xmin)*n,(ymax-ymin)*n,[xmin+(xmax-xmin)*x,ymin+(ymax-ymin)*y]);
+
+// Rough surface, Susumu's pillars
+int cN = (xmax-xmin)/pd;
+cout << "Old xmax = " << xmax << endl;
+xmax = xmin + (cN+1)*pd;
+cout << "Obtained modified xmax = " << xmax << ", " << cN+1 << " repeating structures!" << endl;
+
+// Starting straigth line to the left
+border bnd100(t=xmin,xmin+2*pd)  {x=t;    y=ymin; label=1; }
+// Include generated border definitions
+// border bnd101a(t=0,ph/sin(pa))            {x=xmin+2*pp+t*cos(pa);     y=ymin+t*sin(pa); label=1; }
+// border bnd101b(t=0,pw)                    {x=xmin+2*pp+ph/tan(pa)+t;  y=ymin+ph;        label=1; }
+// border bnd101c(t=ph/sin(pa),0)            {x=xmin+2*pp+t*cos(pa)+pw;  y=ymin+t*sin(pa); label=1; }
+// border bnd101d(t=xmin+2*pp+pw,xmin+3*pp)  {x=t;                       y=ymin;           label=1; }
+// ...
+include "include_surface_def.idp"
+// Finishing straight line to the right
+border bnd199(t=xmin+(cN-1)*pd,xmin+(cN+1)*pd)  {x=t;    y=ymin; label=1; }
+// Remaining boundaries
+border bnd2(t=ymin,ymax) {x=xmax; y=t;       label=2; }
+border bnd3(t=xmax,xmin) {x=t;    y=ymax;    label=3; }
+border bnd4(t=ymax,ymin) {x=xmin; y=t;       label=4; }
+
+// Create the mesh, also through included file
+// mesh Th = buildmesh( bnd101a(1)+...+bnd2(n*(ymax-ymin))+bnd3(n*(xmax-xmin))+bnd4(n*(ymax-ymin)) );
+include "include_surface_msh.idp"
+plot(Th);
+
+
+// Define needed FE spaces and functions
+fespace Ph2 (Th,P2,periodic=[[2,y],[4,y]]);
+fespace Ph1 (Th,P1,periodic=[[2,y],[4,y]]);
+fespace PFh1(Th,[P1,P1],periodic=[[2,y],[4,y]]);
+fespace FLh (Th,[P2,P2,P1],periodic=[[2,y],[4,y]]);
+FLh [u,v,p], [uu,vv,pp], [uO,vO,pO];
+Ph2 str, vstr;
+PFh1 [fi,c], [fifi,cc], [fiO,cO];
+
+// Define density and viscosity as functions of phase field variable, always centered in time
+func rho = (c >=-1.0)*(c <=1.0)*0.5*(c +1-rho2*(c -1)) + (c <-1.0)*rho2 + (c >1.0);
+func rhoO= (cO>=-1.0)*(cO<=1.0)*0.5*(cO+1-rho2*(cO-1)) + (cO<-1.0)*rho2 + (cO>1.0);
+func mu  = (c >=-1.0)*(c <=1.0)*0.5*(c +1-mu2* (c -1)) + (c <-1.0)*mu2  + (c >1.0);
+func muO = (cO>=-1.0)*(cO<=1.0)*0.5*(cO+1-mu2* (cO-1)) + (cO<-1.0)*mu2  + (cO>1.0);
+
+// Define individual contact line frictions for advancing and receding lines
+real[int] xibot(2), xibot2(2);
+func muf = mufa;
+
+// -------------------------------------------------------------------------------------------------------------------------------------
+// Compilation of macros
+// Mesh adaptation and destruction of the old mesh
+macro getAdaptMesh()
+Th = adaptmesh(Th,c,hmin=1.0/(n*refI),hmax=1.0/n,iso=true,ratio=mGrw,err=0.001,nbvx=1e8,periodic=[[2,y],[4,y]]);
+[uu,vv,pp] = [0,0,0]; [fifi,cc]  = [0,0];
+[u,v,p]    = [u,v,p]; [uO,vO,pO] = [uO,vO,pO];
+[fi,c] = [fi,c]; [fiO,cO] = [fiO,cO];
+// EOM
+// Macro for non-linear solutions
+macro solveNonLinPFeq()
+eq12phasefield;
+cout << "PF done ";
+// EOM
+macro solveNonLinNSeq()
+NStokesExpl;
+cout << "NS done ";
+// EOM
+// Macro for checking the maxmial CFL number
+real maxCFL;
+int nt;
+real mgU, xa, xb, ya, yb, ds;
+macro getMaxCFL()
+nt = Th.nt;
+maxCFL = 0.0;
+for(int i=0; i<nt; i++)
+{
+    for(int j=0; j<3; j++)
+    {
+        xa = Th[i][ j     ].x; ya = Th[i][ j     ].y;
+        xb = Th[i][(j+1)%3].x; yb = Th[i][(j+1)%3].y;
+        ds = sqrt((xb-xa)^2+(yb-ya)^2);
+        mgU = max(sqrt(u(xa,ya)^2+v(xa,ya)^2),sqrt(u(xb,yb)^2+v(xb,yb)^2));
+        maxCFL = max(maxCFL,mgU*dt/ds);
+    }
+}
+// EOM
+// Macro for checking the maxmial Von-Neummann number
+real maxVN;
+macro getMaxVN()
+nt = Th.nt;
+maxVN = 5.0;
+for(int i=0; i<nt; i++)
+{
+    for(int j=0; j<3; j++)
+    {
+        xa = Th[i][ j     ].x; ya = Th[i][ j     ].y;
+        xb = Th[i][(j+1)%3].x; yb = Th[i][(j+1)%3].y;
+        ds = sqrt((xb-xa)^2+(yb-ya)^2);
+        maxVN = min(maxVN,ds);
+    }
+}
+maxVN = 1/Pe*dt/maxVN^2;
+// EOM
+// Extracting the two iso-lines defining the left and the right interface, compute interface locations at top and bottom wall
+real[int] theta(2), thetaS(2);
+real tolBi = 1.0e-8, ax, bx, cx, yc;
+func real getXi(real C, real yup, real xl, real xr)
+{
+    ax = xl; bx = xr; cx = 0.5*(ax+bx);
+    Icur = 0;
+    while(abs(c(cx,ph+yup)-C)>tolBi)
+    {
+        if(sign(c(cx,ph+yup)-C) == sign(c(ax,ph+yup)-C)) ax = cx; else bx = cx;
+        cx = 0.5*(ax+bx); Icur++;
+        if(Icur>Imax) {cout << "Fail in getXi!" << endl; break;}
+    }
+    return cx;
+}
+// Macro to update only the CL location data points, without shift. With shift - treat periodic crossing!!!
+// Macro for updating wall coordinates only. Note - the simple shift upwards for angle calculation did not work, because it is guaranteed to
+// reach a case where the coordinates are not encompassing the C = 0 solution.
+real x1, x2, c1, c2, dxs = 4*Cn, dya = 0.1/30;
+macro updCLcoord()
+{
+x1 = xmin; x2 = x1+dxs;
+for(int p=0; p<2; p++)
+{
+    while( sign(c(x1,ph))==sign(c(x2,ph)) )
+    {
+        x1=x1+dxs; x2=x2+dxs;
+        if(x2 > xmax) {cout << "Fail in updCLcoord, bottom wall!" << endl; break; }
+    }
+    if( c(x1,ph) < c(x2,ph) )
+    {
+        xibot(0) = getXi(0.0,0.0,x1,x2);
+    }
+    else
+    {
+        xibot(1) = getXi(0.0,0.0,x1,x2);
+    }
+    x1=x1+dxs; x2=x2+dxs;
+}
+x1 = xmin; x2 = x1+dxs;
+} // EOM
+// -------------------------------------------------------------------------------------------------------------------------------------
+// End of macro compilation
+// -------------------------------------------------------------------------------------------------------------------------------------
+
+real cTh = cos(thE);
+
+
+// Cahn-Hilliard equations
+problem eq12phasefield([fi,c],[fifi,cc],solver=sparsesolver,master=0)
+    = int2d(Th)    ( dt*fi*fifi - dt*c*(cO^2  )*fifi - dt*Cn^2*(dx(c)*dx(fifi)+dy(c)*dy(fifi))  )
+    + int2d(Th)    (                     +dt*cO*fifi                                            )
+    + int1d(Th,1,3)(-dt*sqrt(2)/2*Cn*cTh*c*cO*fifi  - 2*sqrt(2)/3*Cn^2*Ca*muf*(c  + dt*uO*dx(c)+dt*vO*dy(c) )*fifi )
+    + int1d(Th,1,3)( dt*sqrt(2)/2*Cn*cTh     *fifi  + 2*sqrt(2)/3*Cn^2*Ca*muf* cO                            *fifi )
+    + int2d(Th)    ( c *cc - dt*c*(uO*dx(cc)+vO*dy(cc)) + dt*3/(4*sqrt(2))/Pe*(dx(fi )*dx(cc)+dy(fi )*dy(cc)) )
+    + int2d(Th)    (-cO*cc                              + dt*3/(4*sqrt(2))/Pe*(dx(fiO)*dx(cc)+dy(fiO)*dy(cc)) )
+    + int1d(Th,1,3)( dt*c*(uO*N.x+vO*N.y)*cc );
+
+// Navier-Stokes equations
+problem NStokesExpl([u,v,p],[uu,vv,pp],solver=sparsesolver,master=0)
+    = int2d(Th)(   dt/Re*(-p + 2.0*mu*dx(u))*dx(uu) + dt/Re*mu*(dy(u)+dx(v))*dy(uu)
+                 + dt/Re*(-p + 2.0*mu*dy(v))*dy(vv) + dt/Re*mu*(dx(v)+dy(u))*dx(vv)
+                   - (dx(u)+dy(v))*pp - 1e-10*p*pp
+                + rho *( (u *uu+v *vv) + dt*(uO*dx(u )+vO*dy(u ))*uu + dt*(uO*dx(v )+vO*dy(v ))*vv
+                                       + dt*(u *dx(uO)+v *dy(uO))*uu + dt*(u *dx(vO)+v *dy(vO))*vv )  )
+    + int2d(Th)(  rho *(-(uO*uu+vO*vv) - dt*(uO*dx(uO)+vO*dy(uO))*uu - dt*(uO*dx(vO)+vO*dy(vO))*vv )
+                 - 3/(2*sqrt(2))*dt*fiO*(dx(cO)*uu+dy(cO)*vv)/(Cn*Ca*Re) )
+    + on(1,3,u=0,v=0);
+               
+// Initialisation
+[fi,c] = [0,initC];
+// Initial mesh adaptation
+getAdaptMesh
+// Reinitialise the function, since it has a known value, adapt mesh again
+[fi,c] = [0,initC];
+getAdaptMesh
+// Reinitialise the function, since it has a known value, adapt mesh again
+[fi,c] = [0,initC];
+getAdaptMesh
+// Final initialisation of the function
+[fi,c] = [0,initC];
+
+lineProbeSave(-4.0,-0.5,4.0,0.5,600,Th,c,"sample_c.txt")
+
+// Getting updated CL coordinates for slip transition
+
+// Velocity is initialised after slip can be computed
+[u,v,p] = [0,-UimpNd*(c+1)/2,0];
+
+// Remaining initialisation
+uO[] = u[];
+fiO[] = fi[];
+
+cout << cTh << endl;
+
+int nAout, nAdapt, nRest;
+real curt;
+if(bNew==1)
+{
+    // Output initial state
+    nAout=0; nAdapt=0; nRest=0;
+    curt=0.0;
+    // save output in VTK format
+    savevtk("data/out_"+nAout+".vtk",Th,[u,v],p,c,fi,rho,mu,str,dataname="velocity pressure cvar phivar rho mu str");
+    // save the data in FF++ format
+    savemesh(Th,"data/out_"+nAout+".msh");
+    {
+    ofstream resfile("data/out_"+nAout+".dat");
+    resfile << u[];
+    resfile << fi[];
+    }
+    nAout++;
+    // Prepare the statistics file (text file with drop displacement, angles)
+    {
+    ofstream resfile("stats.txt");
+    xct = int2d(Th)(x*(c+1)/2)/int2d(Th)((c+1)/2);
+    yct = int2d(Th)(y*(c+1)/2)/int2d(Th)((c+1)/2);
+    resfile << "# t, xL, yL, xR, yR, theta_L [deg], thetaS_L [deg], theta_R [deg], thetaS_R [deg], ycom, xcom" << endl;
+    resfile << 0.0 << " " << xibot(0) << " " << 0.0 << " " << xibot(1) << " " << 0.0 << " " << theta(0) << " " << thetaS(0) << " " << theta(1) << " " << thetaS(1) << " " << yct << " " << xct << endl;
+    }
+}
+else if(bNew==0)
+{
+    ifstream restxt("data/restart.txt");
+    restxt >> nAout; restxt >> nAdapt; restxt >> curt;
+    cout << "Read previous state with curt = " << curt << endl;
+    Th = readmesh("data/out_"+nAout+".msh");
+    [uu,vv,pp] = [0,0,0]; [fifi,cc]  = [0,0];
+    [u,v,p]    = [0,0,0]; [uO,vO,pO] = [0,0,0];
+    [fi,c] = [0,0]; [fiO,cO] = [0,0];
+    ifstream resdat("data/out_"+nAout+".dat");
+    resdat >> uO[];
+    resdat >> fiO[];
+    nAout++;
+    // Process statistics file
+    exec("mv stats.txt stats_old.txt");
+    ifstream prevst("stats_old.txt");
+    ofstream updtst("stats.txt");
+    updtst << "# t, xL, yL, xR, yR, theta_L [deg], thetaS_L [deg], theta_R [deg], thetaS_R [deg], ycom, xcom" << endl;
+    string tmp;
+    for(int i=0; i<16; i++) prevst >> tmp;
+    real readt, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8, tmp9, tmp10;
+    while(1)
+    {
+    prevst >> readt; prevst >> tmp1; prevst >> tmp2; prevst >> tmp3; prevst >> tmp4; prevst >> tmp5; prevst >> tmp6; prevst >> tmp7; prevst >> tmp8; prevst >> tmp9; prevst >> tmp10;
+    updtst << readt << " " << tmp1 << " " << tmp2 << " " << tmp3 << " " << tmp4 << " " << tmp5 << " " << tmp6 << " " << tmp7 << " " << tmp8 << " " << tmp9 << " " << tmp10 << endl;
+    if(abs(readt-curt) < 0.01*dt) break;
+    }
+    exec("rm stats_old.txt");    
+}
+else
+{
+    cout << "Unknown bNew setting " << bNew << endl;
+    exit(1);
+}
+
+
+
+// Plot initial mesh and pf distribution
+//plot(t,fill=1,value=1);
+plot(Th);
+//plot(u,fill=1,value=1);
+plot(c,fill=1,value=1);
+// plot(fi,fill=1,value=1);
+
+
+// // Time stepping
+// int nTsteps = tfin/dt;
+// //int nTout   = tout/dt;
+real divChck, dxdtChck = 10.0, dxOld = 0.0, dxNew;
+int  NstedChck = 0;
+// for(int i=1; i<nTsteps; i++)
+// while(abs(dxdtChck) > tolST)
+// while(NstedChck < Nsted)
+maxCFL = 0.1;
+while(maxCFL > 1e-4)
+{
+    // If needed, carry out mesh adaptation, solve again, adapt again
+    if( nAdapt == dref)
+    {
+        cout << "    Mesh adpt 1, ";
+        getAdaptMesh
+        solveNonLinPFeq
+        cout << " ";
+        solveNonLinNSeq
+        cout << endl << "    Mesh adpt 2, ";
+        getAdaptMesh
+        getMaxVN
+        solveNonLinPFeq
+        cout << " ";
+        solveNonLinNSeq
+        cout << ", " << maxVN << endl;
+        nAdapt++;
+        //plot(Th);
+        // getInterfGeom
+        nAdapt = 0;
+    }
+
+    // Solve the PF equations
+    curt = curt+dt;
+    cout << "ct = " << curt << ", ";
+    solveNonLinPFeq
+    // Prepare for and solve NS equations
+    cout << " ";
+    solveNonLinNSeq
+    getMaxCFL
+    plot(c,fill=1,value=1);    
+    //getInterfGeom
+    // updCLcoord
+    // dxNew = xstop(0)-xsbot(0);
+    // dxdtChck = (dxNew-dxOld)/dt;
+    // if(abs(dxdtChck) > tolST) NstedChck = 0; else NstedChck++;
+    cout << " CFL " << maxCFL << " xL " << xibot(0) << " xR " << xibot(1) << " tL " << theta(0) << " tR " << theta(1) << " dxdt " << dxdtChck << endl;
+    // Output to the stats file
+    yct = int2d(Th)(y*(c+1)/2)/int2d(Th)((c+1)/2);
+    xct = int2d(Th)(x*(c+1)/2)/int2d(Th)((c+1)/2);
+    {
+    ofstream resfile("stats.txt",append);
+    resfile << curt << " " << xibot(0) << " " << 0.0 << " " << xibot(1) << " " << 0.0 << " " << theta(0) << " " << thetaS(0) << " " << theta(1) << " " << thetaS(1) << " " << yct << " " << xct << endl;
+    }
+    
+    // If needed, save data, output some additional information
+    if( abs(curt-nAout*tout) < 0.01*tout )
+    {
+        cout << " Saving data to file " << nAout << " !" << endl;
+        // Solve for streamlines
+        solve streamlines(str,vstr,solver=sparsesolver,master=0) =
+             int2d(Th)( - (dx(str)*dx(vstr)+dy(str)*dy(vstr)) - 1.0e-10*str*vstr )
+           + int1d(Th,1,2,3,4)( (-v*N.x+u*N.y)*vstr ) // No-slip gives zero-derivative
+           + int2d(Th)( (dx(v) - dy(u))*vstr );
+        // save output in VTK format
+        savevtk("data/out_"+nAout+".vtk",Th,[u,v],p,c,fi,rho,mu,str,dataname="velocity pressure cvar phivar rho mu str");
+        // save the data in FF++ format
+        savemesh(Th,"data/out_"+nAout+".msh");
+        ofstream resfile("data/out_"+nAout+".dat");
+        resfile << u[];
+        resfile << fi[];
+        ofstream restxt("data/restart.txt");
+        restxt << nAout << endl; restxt << nAdapt << endl;
+        restxt << curt << endl; 
+        nAout++;
+        nRest++;
+        divChck = int2d(Th)( dx(u)+dy(v) );
+        cout << " Divergence of flow field = " << divChck << endl;
+        // plot(fi,fill=1,value=1);
+        plot(c,fill=1,value=1);
+        // plot(u,fill=1,value=1);
+    }
+    // Prepare for the next time step
+    uO[] = u[]; fiO[] = fi[]; dxOld = dxNew;
+    nAdapt++;
+    // plot(fi,fill=1,value=1);
+    plot(c,fill=1,value=1);
+    // plot(u,fill=1,value=1);
+}
+
+// Final outputs after the end of the simulation
+{
+cout << "Reached steady droplet state, stopping." << endl;
+ofstream flag("simdone");
+flag << 1 << endl;
+cout << " Saving final data to file!" << endl;
+// save output in VTK format
+savevtk("data/out_Final.vtk",Th,[u,v],p,c,fi,rho,mu,str,dataname="velocity pressure cvar phivar rho mu str");
+// save the data in FF++ format
+savemesh(Th,"data/out_Final.msh");
+ofstream resfile("data/out_Final.dat");
+resfile << u[];
+resfile << fi[];
+}

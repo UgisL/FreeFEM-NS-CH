@@ -1,0 +1,21 @@
+// ----------------------------------------------- COPYRIGHT --------------------------------------
+// Copyright 2020-2022
+// Ugis Lacis, ugis.lacis@gmail.com
+// Shervin Bagheri, shervin.bagheri@mech.kth.se
+// -------------------------------------------- LICENSE LGPLv3 ------------------------------------
+// This file is part of FreeFEM-NS-CH.
+//
+// Porous_full_bc2ifScales is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// FreeFEM-NS-CH is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with FreeFEM-NS-CH. If not, see <http://www.gnu.org/licenses/>.
+
+mesh Th = buildmesh(bnd100(2)+bnd101a(1)+bnd101b(1)+bnd101c(1)+bnd101d(1)+bnd102a(1)+bnd102b(1)+bnd102c(1)+bnd102d(1)+bnd103a(1)+bnd103b(1)+bnd103c(1)+bnd103d(1)+bnd104a(1)+bnd104b(1)+bnd104c(1)+bnd104d(1)+bnd105a(1)+bnd105b(1)+bnd105c(1)+bnd105d(1)+bnd106a(1)+bnd106b(1)+bnd106c(1)+bnd106d(1)+bnd107a(1)+bnd107b(1)+bnd107c(1)+bnd107d(1)+bnd108a(1)+bnd108b(1)+bnd108c(1)+bnd108d(1)+bnd109a(1)+bnd109b(1)+bnd109c(1)+bnd109d(1)+bnd110a(1)+bnd110b(1)+bnd110c(1)+bnd110d(1)+bnd111a(1)+bnd111b(1)+bnd111c(1)+bnd111d(1)+bnd112a(1)+bnd112b(1)+bnd112c(1)+bnd112d(1)+bnd113a(1)+bnd113b(1)+bnd113c(1)+bnd113d(1)+bnd114a(1)+bnd114b(1)+bnd114c(1)+bnd114d(1)+bnd199(2)+bnd2(n*(ymax-ymin))+bnd3(n*(xmax-xmin))+bnd4(n*(ymax-ymin)) );

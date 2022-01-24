@@ -1,0 +1,164 @@
+// ----------------------------------------------- COPYRIGHT --------------------------------------
+// Copyright 2020-2022
+// Ugis Lacis, ugis.lacis@gmail.com
+// Shervin Bagheri, shervin.bagheri@mech.kth.se
+// -------------------------------------------- LICENSE LGPLv3 ------------------------------------
+// This file is part of FreeFEM-NS-CH.
+//
+// Porous_full_bc2ifScales is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// FreeFEM-NS-CH is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with FreeFEM-NS-CH. If not, see <http://www.gnu.org/licenses/>.
+// ---------------------------------------------- DESCRIPTION -------------------------------------
+// Set of functions and macros useful for postprocessing results.
+// Provides volume average using
+// trapezoidal rule, as well as outputing plane averaged profiles.
+// We also define color scheme here.
+
+// Line probe macro
+macro lineProbeSave(x1,y1,x2,y2,Nsmp,MSH,var,fname)
+{
+ofstream resfile(fname);
+resfile << "# Line probe from (" << x1 << "," << y1 << ") to (" << x2 << "," << y2 << ")" << endl;
+resfile << "# s, x, y, var" << endl;
+real stot = sqrt((x2-(x1))^2+(y2-(y1))^2);
+int Ntot = stot*Nsmp;
+real scur = 0, xcur, ycur, ds = stot/(Ntot-1), delx = (x2-(x1))/(Ntot-1), dely = (y2-(y1))/(Ntot-1);
+for (int i=0; i<Ntot; i++)
+{
+    scur = i*ds; xcur = x1 + i*delx; ycur = y1 + i*dely;
+    resfile << scur << " " << xcur << " " << ycur << " " << var(xcur,ycur) << endl;
+}
+}// EOM
+
+// Volume averaging macro, need outvar defined in the main file
+// (to avoid multiple definitions of the variable.
+macro volAvg(miny,maxy,Ntrp,MSH,var,outvar)
+{
+int  Nbox   = #Ntrp;
+real dzstep = ((maxy)-(miny)-2.0e-6)/Nbox;
+real[int] smpval(Nbox+1);
+real tmpval = 0;
+for(int i=0; i<Nbox+1; i++) smpval(i) = int1d(MSH,levelset=(y- (miny+1.0e-6+i*dzstep) ))( var );
+for(int i=0; i<Nbox; i++) tmpval = tmpval + 0.5*(smpval(i)+smpval(i+1))*dzstep;
+outvar = tmpval;
+}
+// EOM
+macro volAvgI(miny,maxy,Ntrp,MSH,var,outvar)
+{
+int  Nbox   = #Ntrp;
+real dzstep = ((maxy)-(miny)-2.0e-6)/Nbox;
+real[int] smpval(Nbox+1);
+real tmpval = 0;
+for(int i=0; i<Nbox+1; i++) smpval(i) = int1d(MSH,levelset=(y- (miny+1.0e-6+i*dzstep) ))( var )
+                                       /int1d(MSH,levelset=(y- (miny+1.0e-6+i*dzstep) ))( 1.0 );
+for(int i=0; i<Nbox; i++) tmpval = tmpval + 0.5*(smpval(i)+smpval(i+1))*dzstep;
+outvar = tmpval;
+}
+// EOM
+
+// Line slice output macro
+macro linAvgSave(MSH, NSamp, velx, vely, pres, fname)
+{
+int Nsp = NSamp*(ymax-ymin);
+real[int,int] PlaneUavg(5,Nsp);
+real          Fslice;
+for (int i=0; i<Nsp; i++)
+{
+    PlaneUavg(0,i) = ymin+1e-6 + i*(ymax-ymin-2e-6)/(Nsp-1.0);
+    Fslice         = int1d(MSH,levelset=(y-PlaneUavg(0,i)))( 1.0  );
+    PlaneUavg(1,i) = int1d(MSH,levelset=(y-PlaneUavg(0,i)))( velx );
+    PlaneUavg(2,i) = int1d(MSH,levelset=(y-PlaneUavg(0,i)))( vely );
+    PlaneUavg(3,i) = int1d(MSH,levelset=(y-PlaneUavg(0,i)))( pres );
+    PlaneUavg(4,i) = PlaneUavg(3,i) / Fslice;
+}
+ofstream resfile(fname);
+resfile << "# interface coord = " << yi << endl;
+resfile << "# y, <u>_y, <v>_y, <p>_y, <p>^i_y " << endl;
+for (int i=0; i<Nsp; i++)
+    resfile << PlaneUavg(0,i) << " " << PlaneUavg(1,i) << " " << PlaneUavg(2,i) << " "
+            << PlaneUavg(3,i) << " " << PlaneUavg(4,i) << endl;
+}
+// EOM
+
+// Macro for plotting
+macro plotfields(name,id,nlev,clrschm)
+if(name=="perm")
+{
+    IFMACRO(Type,porous)
+    plot(uper#id,uK#id,nbiso=#nlev,hsv=#clrschm,fill=1,value=1);
+    plot(vper#id,vK#id,nbiso=#nlev,hsv=#clrschm,fill=1,value=1);
+    ENDIFMACRO
+    IFMACRO(Type,textured)
+    plot(uK#id,nbiso=#nlev,hsv=#clrschm,fill=1,value=1);
+    plot(vK#id,nbiso=#nlev,hsv=#clrschm,fill=1,value=1);
+    ENDIFMACRO
+    plot(      pK#id,nbiso=#nlev,hsv=#clrschm,fill=1,value=1);
+}
+if(name=="slip")
+{
+    plot(uL,nbiso=#nlev,hsv=#clrschm,fill=1,value=1);
+    plot(vL,nbiso=#nlev,hsv=#clrschm,fill=1,value=1);
+    plot(pL,nbiso=#nlev,hsv=#clrschm,fill=1,value=1);
+}
+
+// EOM
+
+// Colorschemes
+// Define the "jet" colorscheme, BUT - it is intensity incorrect (black & white prints look weird)
+real[int] colorsJET = [
+    6.666666666666666297e-01, 1.000000000000000000e+00, 8.333000000000000407e-01,
+    6.666666666666666297e-01, 1.000000000000000000e+00, 1.000000000000000000e+00,
+    6.388833333333332476e-01, 1.000000000000000000e+00, 1.000000000000000000e+00,
+    6.111166666666666414e-01, 1.000000000000000000e+00, 1.000000000000000000e+00,
+    5.833333333333332593e-01, 1.000000000000000000e+00, 1.000000000000000000e+00,
+    5.555499999999999883e-01, 1.000000000000000000e+00, 1.000000000000000000e+00,
+    5.277833333333332710e-01, 1.000000000000000000e+00, 1.000000000000000000e+00,
+    5.000000000000000000e-01, 1.000000000000000000e+00, 1.000000000000000000e+00,
+    4.666586663466538720e-01, 8.333000000000000407e-01, 1.000000000000000000e+00,
+    4.166791660416978571e-01, 6.667000000000000703e-01, 1.000000000000000000e+00,
+    3.333333333333333148e-01, 5.000000000000000000e-01, 1.000000000000000000e+00,
+    2.499875006249687726e-01, 6.667000000000000703e-01, 1.000000000000000000e+00,
+    2.000080003200127854e-01, 8.333000000000000407e-01, 1.000000000000000000e+00,
+    1.666666666666666574e-01, 1.000000000000000000e+00, 1.000000000000000000e+00,
+    1.388833333333333309e-01, 1.000000000000000000e+00, 1.000000000000000000e+00,
+    1.111166666666666553e-01, 1.000000000000000000e+00, 1.000000000000000000e+00,
+    8.333333333333332871e-02, 1.000000000000000000e+00, 1.000000000000000000e+00,
+    5.554999999999999521e-02, 1.000000000000000000e+00, 1.000000000000000000e+00,
+    2.778333333333333002e-02, 1.000000000000000000e+00, 1.000000000000000000e+00,
+    0.000000000000000000e+00, 1.000000000000000000e+00, 1.000000000000000000e+00,
+    0.000000000000000000e+00, 1.000000000000000000e+00, 8.333000000000000407e-01
+    ];
+// Intesity-correct colorscheme
+// Define the "cubehelix" colorscheme, Green-ish (https://www.mrao.cam.ac.uk/~dag/CUBEHELIX/cubetry.html)
+real[int] colorsCUBE = [
+    0.000000000000000000e+00, 0.000000000000000000e+00, 0.000000000000000000e+00,
+    6.474926253687315336e-01, 7.902097902097902082e-01, 1.429999999999999882e-01,
+    6.219336219336218941e-01, 8.587360594795538926e-01, 2.690000000000000169e-01,
+    5.993217054263565435e-01, 9.197860962566843934e-01, 3.739999999999999991e-01,
+    5.784313725490195512e-01, 9.714285714285714191e-01, 4.550000000000000155e-01,
+    5.589192708333332593e-01, 1.000000000000000000e+00, 5.120000000000000107e-01,
+    5.386029411764705621e-01, 1.000000000000000000e+00, 5.440000000000000391e-01,
+    5.150421179302044905e-01, 1.000000000000000000e+00, 5.540000000000000480e-01,
+    4.888888888888889284e-01, 1.000000000000000000e+00, 5.849999999999999645e-01,
+    4.657464212678936732e-01, 9.878787878787879118e-01, 6.600000000000000311e-01,
+    4.437840515106488692e-01, 9.257221458046767104e-01, 7.269999999999999796e-01,
+    4.223227752639516774e-01, 8.467432950191571273e-01, 7.830000000000000293e-01,
+    3.999999999999999667e-01, 7.539203860072376528e-01, 8.289999999999999591e-01,
+    3.755952380952380931e-01, 6.481481481481482509e-01, 8.639999999999999902e-01,
+    3.477192982456139836e-01, 5.337078651685394082e-01, 8.900000000000000133e-01,
+    3.155186064924782041e-01, 4.631463146314631629e-01, 9.090000000000000302e-01,
+    2.861552028218694588e-01, 4.095341278439869614e-01, 9.230000000000000426e-01,
+    2.591397849462365732e-01, 3.311965811965812412e-01, 9.360000000000000542e-01,
+    2.328767123287670826e-01, 2.305263157894736625e-01, 9.499999999999999556e-01,
+    2.050147492625369328e-01, 1.164948453608247309e-01, 9.699999999999999734e-01,
+    0.000000000000000000e+00, 0.000000000000000000e+00, 1.000000000000000000e+00
+    ];

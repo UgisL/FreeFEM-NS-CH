@@ -1,0 +1,76 @@
+// ----------------------------------------------- COPYRIGHT --------------------------------------
+// Copyright 2020-2022
+// Ugis Lacis, ugis.lacis@gmail.com
+// Shervin Bagheri, shervin.bagheri@mech.kth.se
+// -------------------------------------------- LICENSE LGPLv3 ------------------------------------
+// This file is part of FreeFEM-NS-CH.
+//
+// Porous_full_bc2ifScales is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// FreeFEM-NS-CH is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with FreeFEM-NS-CH. If not, see <http://www.gnu.org/licenses/>.
+
+border bnd101a(t=0,ph/sin(pa))            {x=xmin+2*pd+t*cos(pa);     y=ymin+t*sin(pa); label=1; }
+border bnd101b(t=0,pw)                    {x=xmin+2*pd+ph/tan(pa)+t;  y=ymin+ph;        label=1; }
+border bnd101c(t=ph/sin(pa),0)            {x=xmin+2*pd+t*cos(pa)+pw;  y=ymin+t*sin(pa); label=1; }
+border bnd101d(t=xmin+2*pd+pw,xmin+3*pd){x=t;                        y=ymin;           label=1; }
+border bnd102a(t=0,ph/sin(pa))            {x=xmin+3*pd+t*cos(pa);     y=ymin+t*sin(pa); label=1; }
+border bnd102b(t=0,pw)                    {x=xmin+3*pd+ph/tan(pa)+t;  y=ymin+ph;        label=1; }
+border bnd102c(t=ph/sin(pa),0)            {x=xmin+3*pd+t*cos(pa)+pw;  y=ymin+t*sin(pa); label=1; }
+border bnd102d(t=xmin+3*pd+pw,xmin+4*pd){x=t;                        y=ymin;           label=1; }
+border bnd103a(t=0,ph/sin(pa))            {x=xmin+4*pd+t*cos(pa);     y=ymin+t*sin(pa); label=1; }
+border bnd103b(t=0,pw)                    {x=xmin+4*pd+ph/tan(pa)+t;  y=ymin+ph;        label=1; }
+border bnd103c(t=ph/sin(pa),0)            {x=xmin+4*pd+t*cos(pa)+pw;  y=ymin+t*sin(pa); label=1; }
+border bnd103d(t=xmin+4*pd+pw,xmin+5*pd){x=t;                        y=ymin;           label=1; }
+border bnd104a(t=0,ph/sin(pa))            {x=xmin+5*pd+t*cos(pa);     y=ymin+t*sin(pa); label=1; }
+border bnd104b(t=0,pw)                    {x=xmin+5*pd+ph/tan(pa)+t;  y=ymin+ph;        label=1; }
+border bnd104c(t=ph/sin(pa),0)            {x=xmin+5*pd+t*cos(pa)+pw;  y=ymin+t*sin(pa); label=1; }
+border bnd104d(t=xmin+5*pd+pw,xmin+6*pd){x=t;                        y=ymin;           label=1; }
+border bnd105a(t=0,ph/sin(pa))            {x=xmin+6*pd+t*cos(pa);     y=ymin+t*sin(pa); label=1; }
+border bnd105b(t=0,pw)                    {x=xmin+6*pd+ph/tan(pa)+t;  y=ymin+ph;        label=1; }
+border bnd105c(t=ph/sin(pa),0)            {x=xmin+6*pd+t*cos(pa)+pw;  y=ymin+t*sin(pa); label=1; }
+border bnd105d(t=xmin+6*pd+pw,xmin+7*pd){x=t;                        y=ymin;           label=1; }
+border bnd106a(t=0,ph/sin(pa))            {x=xmin+7*pd+t*cos(pa);     y=ymin+t*sin(pa); label=1; }
+border bnd106b(t=0,pw)                    {x=xmin+7*pd+ph/tan(pa)+t;  y=ymin+ph;        label=1; }
+border bnd106c(t=ph/sin(pa),0)            {x=xmin+7*pd+t*cos(pa)+pw;  y=ymin+t*sin(pa); label=1; }
+border bnd106d(t=xmin+7*pd+pw,xmin+8*pd){x=t;                        y=ymin;           label=1; }
+border bnd107a(t=0,ph/sin(pa))            {x=xmin+8*pd+t*cos(pa);     y=ymin+t*sin(pa); label=1; }
+border bnd107b(t=0,pw)                    {x=xmin+8*pd+ph/tan(pa)+t;  y=ymin+ph;        label=1; }
+border bnd107c(t=ph/sin(pa),0)            {x=xmin+8*pd+t*cos(pa)+pw;  y=ymin+t*sin(pa); label=1; }
+border bnd107d(t=xmin+8*pd+pw,xmin+9*pd){x=t;                        y=ymin;           label=1; }
+border bnd108a(t=0,ph/sin(pa))            {x=xmin+9*pd+t*cos(pa);     y=ymin+t*sin(pa); label=1; }
+border bnd108b(t=0,pw)                    {x=xmin+9*pd+ph/tan(pa)+t;  y=ymin+ph;        label=1; }
+border bnd108c(t=ph/sin(pa),0)            {x=xmin+9*pd+t*cos(pa)+pw;  y=ymin+t*sin(pa); label=1; }
+border bnd108d(t=xmin+9*pd+pw,xmin+10*pd){x=t;                        y=ymin;           label=1; }
+border bnd109a(t=0,ph/sin(pa))            {x=xmin+10*pd+t*cos(pa);     y=ymin+t*sin(pa); label=1; }
+border bnd109b(t=0,pw)                    {x=xmin+10*pd+ph/tan(pa)+t;  y=ymin+ph;        label=1; }
+border bnd109c(t=ph/sin(pa),0)            {x=xmin+10*pd+t*cos(pa)+pw;  y=ymin+t*sin(pa); label=1; }
+border bnd109d(t=xmin+10*pd+pw,xmin+11*pd){x=t;                        y=ymin;           label=1; }
+border bnd110a(t=0,ph/sin(pa))            {x=xmin+11*pd+t*cos(pa);     y=ymin+t*sin(pa); label=1; }
+border bnd110b(t=0,pw)                    {x=xmin+11*pd+ph/tan(pa)+t;  y=ymin+ph;        label=1; }
+border bnd110c(t=ph/sin(pa),0)            {x=xmin+11*pd+t*cos(pa)+pw;  y=ymin+t*sin(pa); label=1; }
+border bnd110d(t=xmin+11*pd+pw,xmin+12*pd){x=t;                        y=ymin;           label=1; }
+border bnd111a(t=0,ph/sin(pa))            {x=xmin+12*pd+t*cos(pa);     y=ymin+t*sin(pa); label=1; }
+border bnd111b(t=0,pw)                    {x=xmin+12*pd+ph/tan(pa)+t;  y=ymin+ph;        label=1; }
+border bnd111c(t=ph/sin(pa),0)            {x=xmin+12*pd+t*cos(pa)+pw;  y=ymin+t*sin(pa); label=1; }
+border bnd111d(t=xmin+12*pd+pw,xmin+13*pd){x=t;                        y=ymin;           label=1; }
+border bnd112a(t=0,ph/sin(pa))            {x=xmin+13*pd+t*cos(pa);     y=ymin+t*sin(pa); label=1; }
+border bnd112b(t=0,pw)                    {x=xmin+13*pd+ph/tan(pa)+t;  y=ymin+ph;        label=1; }
+border bnd112c(t=ph/sin(pa),0)            {x=xmin+13*pd+t*cos(pa)+pw;  y=ymin+t*sin(pa); label=1; }
+border bnd112d(t=xmin+13*pd+pw,xmin+14*pd){x=t;                        y=ymin;           label=1; }
+border bnd113a(t=0,ph/sin(pa))            {x=xmin+14*pd+t*cos(pa);     y=ymin+t*sin(pa); label=1; }
+border bnd113b(t=0,pw)                    {x=xmin+14*pd+ph/tan(pa)+t;  y=ymin+ph;        label=1; }
+border bnd113c(t=ph/sin(pa),0)            {x=xmin+14*pd+t*cos(pa)+pw;  y=ymin+t*sin(pa); label=1; }
+border bnd113d(t=xmin+14*pd+pw,xmin+15*pd){x=t;                        y=ymin;           label=1; }
+border bnd114a(t=0,ph/sin(pa))            {x=xmin+15*pd+t*cos(pa);     y=ymin+t*sin(pa); label=1; }
+border bnd114b(t=0,pw)                    {x=xmin+15*pd+ph/tan(pa)+t;  y=ymin+ph;        label=1; }
+border bnd114c(t=ph/sin(pa),0)            {x=xmin+15*pd+t*cos(pa)+pw;  y=ymin+t*sin(pa); label=1; }
+border bnd114d(t=xmin+15*pd+pw,xmin+16*pd){x=t;                        y=ymin;           label=1; }

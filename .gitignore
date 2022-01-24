@@ -1,0 +1,20 @@
+# ignore generated output txt files
+**/*.txt
+# ingnore generated output files
+**/*.dat
+**/*.msh
+**/*.vtk
+# ignore LaTeX log files
+**/*.aux
+**/*.log
+**/*.out
+**/*.synctex.gz
+# ignore snapshots
+**/*.zip
+# ignore MacOS store files
+**/.DS_Store
+# Ignore some temporary files beggining with "_" and "#"
+**/._*
+**/.#*
+# Ignore some back-up files created inside the structure
+**/*.bck
