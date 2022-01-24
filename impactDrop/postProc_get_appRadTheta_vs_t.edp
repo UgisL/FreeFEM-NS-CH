@@ -1,0 +1,140 @@
+// ----------------------------------------------- COPYRIGHT --------------------------------------
+// Copyright 2020-2022
+// Ugis Lacis, ugis.lacis@gmail.com
+// Shervin Bagheri, shervin.bagheri@mech.kth.se
+// -------------------------------------------- LICENSE LGPLv3 ------------------------------------
+// This file is part of FreeFEM-NS-CH.
+//
+// Porous_full_bc2ifScales is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// FreeFEM-NS-CH is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with FreeFEM-NS-CH. If not, see <http://www.gnu.org/licenses/>.
+
+// Level of output
+verbosity = 0;
+
+load "gmsh";
+load "iovtk";
+load "UMFPACK64";
+load "isoline";
+load "Element_P3";
+// load "MUMPS";
+
+include "include_postProc.idp"
+
+// Number of files to be processed
+int Nf = 2844+1;
+
+// Limiting maximum number of iterations in infinite loops
+int Icur, Imax = 100;
+
+// Some definitions from main simulation file
+real Cn  = 0.025;
+real ph = 0.16;
+real xmin = -3.62;
+real xmax =  3.62;
+real pd = 0.24;
+int cN = (xmax-xmin)/pd;
+xmax = xmin + (cN+1)*pd;
+
+// Macro to get apparent radii and angles
+real[int] theta(2), xibot(2);
+real x1, x2, c1, c2, dxs = 4*Cn, yc = 1.2*ph, dya = 0.1/30, xtmp;
+macro updCLcoord()
+{
+    x1 = xmin; x2 = x1+dxs;
+    for(int p=0; p<2; p++)
+    {
+        while( sign(c(x1,yc))==sign(c(x2,yc)) )
+        {
+            x1=x1+dxs; x2=x2+dxs;
+            if(x2 > xmax) {cout << "Fail in updCLcoord!" << endl; break; }
+        }
+        if( c(x1,yc) < c(x2,yc) )
+        {
+            xibot(0) = getXi(0.0,yc-ph,x1,x2);
+            xtmp     = getXi(0.0,yc-ph+dya,x1-dxs,x2+dxs);
+            theta(0) = atan2( dya , xtmp-xibot(0) )/pi*180.0;
+        }
+        else
+        {
+            xibot(1) = getXi(0.0,yc-ph,x1,x2);
+            xtmp     = getXi(0.0,yc-ph+dya,x1-dxs,x2+dxs);
+            theta(1) = 180.0 - atan2( dya , xtmp-xibot(1) )/pi*180.0;
+        }
+        x1=x1+dxs; x2=x2+dxs;
+    }
+    x1 = xmin; x2 = x1+dxs;
+} // EOM
+
+// Physical parameters in dimensional units (properties at 25 deg) 
+// Reference L = 0.125 mm, muw = 8.9e-4 Pa s, rhow = 1000 kg/m3, mug = 1.85e-5, rhog = 1.18 kg/m3, sigma = 0.072 N/m
+// Ca = muw*U/sigma = 0.1 -> Uref = 8.09 m/s, Tref = L/U = 0.01545 ms
+
+// Define the array to hold t, xL, thetaL, xR, thetaR data
+real[int,int] Data(5,Nf);
+real xL, xR, thL, thR;
+
+// First round, dummy read and definitions
+mesh Th = readmesh("data/out_"+0+".msh");
+fespace PFh1(Th,[P1,P1],periodic=[[2,y],[4,y]]);
+fespace FLh (Th,[P2,P2,P1],periodic=[[2,y],[4,y]]);
+FLh [u,v,p];
+PFh1 [fi,c];
+
+
+// Extracting the two iso-lines defining the left and the right interface, compute interface locations at top and bottom wall
+real tolBi = 1.0e-8, ax, bx, cx;
+func real getXi(real C, real yup, real xl, real xr)
+{
+    ax = xl; bx = xr; cx = 0.5*(ax+bx);
+    Icur = 0;
+    while(abs(c(cx,ph+yup)-C)>tolBi)
+    {
+        if(sign(c(cx,ph+yup)-C) == sign(c(ax,ph+yup)-C)) ax = cx; else bx = cx;
+        cx = 0.5*(ax+bx); Icur++;
+        if(Icur>Imax) {cout << "Fail in getXi!" << endl; break;}
+    }
+    return cx;
+}
+
+
+
+for(int i=0; i<Nf; i++)
+{
+    // Read the mesh
+    Th = readmesh("data/out_"+i+".msh");
+    // Reset the needed FE variables
+    [u,v,p] = [0,0,0]; [fi,c] = [0,0];
+    // Read the variable values
+    {
+    ifstream resfile("data/out_"+i+".dat");
+    resfile >> u[];
+    resfile >> fi[];
+    }
+    // Obtain the interface locations and angles
+    updCLcoord
+    // Assign the values to the storage array
+    Data(0,i) = 0.02*i;
+    Data(1,i) = xibot(0);
+    Data(2,i) = theta(0);
+    Data(3,i) = xibot(1);
+    Data(4,i) = theta(1);
+    cout << "Done file " << i << " of " << Nf-1 << endl;
+}
+
+// Save the data to file
+{
+ofstream itffile("drop_apparentR_and_Theta.txt");
+itffile << "# t, xL, thetaL [deg], xR, thetaR [deg]" << endl;
+for(int i=0; i<Nf; i++) itffile << Data(0,i) << " " << Data(1,i) << " " << Data(2,i) << " " << Data(3,i) << " " << Data(4,i) << endl;
+}
+
