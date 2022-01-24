@@ -14,8 +14,8 @@ directory "data" is missing, create it before launching the simulation.
 
 The impact speed can be adjusted by changing variable "Uimp" on
 line . If simulations has been stopped, it can be restarted from
-previous FEM output by changing variable "bNew" (line )
-from 1 to 0
+previous FEM output by changing variable "bNew" (line 88)
+from 1 to 0.
 
 There are three include files:
 1. include_postProc.idp -- some useful post-processing routines

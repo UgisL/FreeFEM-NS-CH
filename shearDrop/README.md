@@ -11,6 +11,9 @@ The simulation will outout some statistics for each time step on screen,
 as well as saved to file "stats.txt". Each 0.02 time units (variable tout)
 the FEM mesh, data and VTK file is outputted to "data" directory. If
 directory "data" is missing, create it before launching the simulation.
+Note that smaller Ca (Sp), Cn (Tn) and Pe numbers typically require
+smaller time step to ensure numerical stability. Experiment by reducing
+the variable dt if your simulation is not stable.
 
 The moving wall speed is controlled by variable Sp and the interface
 thickness by variable Tn in the preable of script. Furthermore, there
