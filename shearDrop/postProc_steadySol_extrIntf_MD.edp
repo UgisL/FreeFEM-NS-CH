@@ -1,0 +1,110 @@
+// Level of output
+verbosity = 0;
+
+load "gmsh";
+load "iovtk";
+load "UMFPACK64";
+load "isoline";
+load "Element_P3";
+// load "MUMPS";
+
+include "include_postProc.idp"
+
+// MD channel height in nm for transition back to physical domain
+real Lphy = 29.2232;
+// MD coordinate of the bottom wall in nm
+real Ymdb = 0.7054;
+
+// Data folder
+string dataf="data";
+
+// Domain extent
+real xmin = -2.7344;
+real xmax =  2.7344;
+real ymin = -0.5;
+real ymax =  0.5;
+
+// Prepare mesh variable and functions
+mesh Th = readmesh(dataf+"/out_Final.msh");
+fespace PFh1(Th,[P1,P1],periodic=[[2,y],[4,y]]);
+fespace FLh (Th,[P2,P2,P1],periodic=[[2,y],[4,y]]);
+FLh [u,v,p];
+PFh1 [fi,c];
+
+// Needed macros for post-processing
+
+// Extracting the two iso-lines defining the left and the right interface, compute interface locations at top and bottom wall
+int N1 = 100, N2 = N1;
+real[int,int] xys1(3,N1), xys2(3,N2);
+real[int] thetaLeft(2);
+real tolBi = 1.0e-8, ax, bx, cx, yc;
+func real getXi(real C, real ys, real xl, real xr)
+{
+    ax = xl; bx = xr; cx = 0.5*(ax+bx);
+    while(abs(c(cx,ys)-C)>tolBi) {if(sign(c(cx,ys)-C) == sign(c(ax,ys)-C)) ax = cx; else bx = cx; cx = 0.5*(ax+bx);}
+    return cx;
+}
+macro getInterfGeom()
+{
+for(int i=0; i<N1; i++)
+{
+    
+    yc = ymin + i*(ymax-ymin)/(N1-1.0); xys1(1,i) = yc; xys2(1,i) = yc;
+    xys1(0,i) = (getXi( 0.0,yc,xmin,0)+getXi( 0.1,yc,xmin,0)+getXi(0.2,yc,xmin,0)
+                +getXi(-0.1,yc,xmin,0)+getXi(-0.2,yc,xmin,0))/5;    
+    xys2(0,i) = (getXi( 0.0,yc,0,xmax)+getXi( 0.1,yc,0,xmax)+getXi(0.2,yc,0,xmax)
+                +getXi(-0.1,yc,0,xmax)+getXi(-0.2,yc,0,xmax))/5;    
+}
+}
+// EOM
+
+// Extract interface from the last solution
+Th = readmesh(dataf+"/out_Final.msh");
+[u,v,p] = [0,0,0]; [fi,c] = [0,0];
+{
+ifstream resfile(dataf+"/out_Final.dat");
+resfile >> u[];
+resfile >> fi[];
+}
+// Carry out the post-processing
+getInterfGeom
+// Rescale the simulation results to MD coordinates
+real xshft = xys1(0,int(N1/2));
+real yshft = xys1(1,0);
+for(int j=0; j<N1; j++)
+{
+    xys1(0,j) = xys1(0,j)*Lphy; xys1(1,j) = Ymdb + (xys1(1,j)-yshft)*Lphy;
+}
+
+// Output the interface data to file
+{
+ofstream itffile("leftItf_Final_MDcoord.txt");
+itffile << "# Left interface data, wall y = " << Ymdb << " nm, domain height L = " << Lphy << " nm" << endl;
+itffile << "# x [nm], y [nm], k [1/nm]" << endl;
+for(int j=0; j<N1; j++) itffile << xys1(0,j) << " " << xys1(1,j) << endl;
+}
+
+    
+// // If needed, can average over number os steady solutions
+// // Create loop over last 50 solutions
+// for(int i=225; i<276; i++)
+// {
+//     Th = readmesh("data/out_"+i+".msh");
+//     [u,v,p] = [0,0,0]; [fi,c] = [0,0];
+//     {
+//     ifstream resfile("data/out_"+i+".dat");
+//     resfile >> u[];
+//     resfile >> fi[];
+//     }
+//     // Carry out the post-processing
+//     getInterfGeom
+//     ofstream itffile("data/leftItf_"+i+".txt");
+//     itffile << "# x, y, s, u dot grad C" << endl;
+//     for(int j=0; j<N1; j++) itffile << xys1(0,j) << " " << xys1(1,j) << " " << xys1(2,j) << " "
+//                                     << u(xys1(0,j),xys1(1,j))*dx(c)(xys1(0,j),xys1(1,j))
+//                                      + v(xys1(0,j),xys1(1,j))*dy(c)(xys1(0,j),xys1(1,j)) << endl;
+//     cout << "Done with file " << i << "!" << endl;
+// }
+
+// Done with the processing
+
