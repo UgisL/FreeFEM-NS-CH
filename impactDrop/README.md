@@ -6,6 +6,7 @@ The published results were obtained with FreeFEM v4.6.
 
 To execute the simulation, enter the following in the command line:
 > FreeFem++.exe -ne PFsolver_NSandCH_dropImpact.edp
+
 The simulation will outout some statistics for each time step on screen,
 as well as saved to file "stats.txt". Each 0.02 time units (variable tout)
 the FEM mesh, data and VTK file is outputted to "data" directory. If
