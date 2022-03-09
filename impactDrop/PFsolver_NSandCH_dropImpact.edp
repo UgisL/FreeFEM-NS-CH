@@ -43,7 +43,7 @@ real UimpNd = Uimp/8.09;
 // Other physical parameters
 real Ca  = 0.1;
 real Cn  = 0.025;
-// According to Yue sharp interface, Pe < 16*sqrt(mu)*Ca/Cn = 18.46 (for these parameters)
+// According to Yue sharp interface, Pe < 16*sqrt(mu)*Ca/Cn = 8.615 (for these parameters)
 real Pe  = 7.116318;      // Small Pe number - seems that I need more non-lin iterations; or smaller time step
 real Re  = 907.4;
 real mu2 = 1.812e-2;
